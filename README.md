@@ -1,1 +1,2 @@
-requirements.txt
+python-telegram-bot
+APSchedulerrequirements.txt
