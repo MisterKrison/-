@@ -1,3 +1,4 @@
+import os # ДОБАВЛЕНО для работы с Render
 import logging
 import random
 import re
@@ -11,7 +12,7 @@ from telegram.ext import (
     ContextTypes,
     ApplicationBuilder,
 )
-from telegram.constants import ParseMode 
+from telegram.constants import ParseMode
 
 # --- 1. ЛОГИРОВАНИЕ И НАСТРОЙКИ ---
 
@@ -20,12 +21,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# TODO: Замените на ваш реальный токен
-BOT_TOKEN = "8271061413:AAGLXXQkpI1T8-QODF3dEOSNydObStR6Isg" 
+# TODO: ЗАМЕНИТЕ на ваш реальный токен от BotFather
+BOT_TOKEN = "8271061413:AAGLXXQkpI1T8-QODF3dEOSNydObStR6Isg"
 
 # --- 2. КОНСТАНТЫ И СОСТОЯНИЯ ---
 
-SECRET_NUMBER_KEY = 'secret_number' 
+SECRET_NUMBER_KEY = 'secret_number'
+# Исправлено регулярное выражение (проблема с re.error: bad escape \p)
 DIGIT_ONLY_FILTER = re.compile(r'^\d+$') 
 bot_active = True
 
@@ -33,7 +35,7 @@ MODES = {
     'kind': 'Добрый Ангел', 'evil': 'Злой Гений',
     'nya': 'Аниме-Няшка', 'servant': 'Учтивый Слуга'
 }
-DEFAULT_MODE = 'kind' 
+DEFAULT_MODE = 'kind'
 
 # ИМЯ СОЗДАТЕЛЯ
 CREATOR_NAME = 'Дмитрий'
@@ -58,10 +60,10 @@ AFFIRMATIVE_TRIGGERS = ['ок', 'да', 'хочу', 'согласен', 'сог�
 AFFIRMATIVE_PATTERN = re.compile(r'^\s*(?:' + '|'.join(AFFIRMATIVE_TRIGGERS) + r')\s*$', re.IGNORECASE)
 
 
-# --- СПИСКИ КОНТЕНТА И ТРИГГЕРЫ (Без эмодзи) ---
+# --- СПИСКИ КОНТЕНТА И ТРИГГЕРЫ ---
 
 jokes = [
-    "Чому програмісти так люблять темряву? — Тому що в ній світяться байти.", 
+    "Чому програмісти так люблять темряву? — Тому що в ній світяться байти.",
     "Що каже програміст, коли йому холодно? — Brrr...",
     "Скільки потрібно програмістів, щоб вкрутити лампочку? — Жодного, це апаратна проблема.",
     "Программист — это машина, превращающая кофе в код."
@@ -84,19 +86,19 @@ bot_names = ['альбедо', 'albedo', 'аль', 'ал', 'аля', 'al']
 bday_trigger_words = ['день рождения', 'др']
 
 sleep_triggers = ['спать', 'пока', 'отключись', 'бай']
-wake_triggers = ['проснись', 'утро'] 
+wake_triggers = ['проснись', 'утро']
 greeting_triggers = ['привет', 'здравствуй', 'ку', 'салют', 'хай']
 
-swear_words = ['fuck', 'shit', 'сука', 'бля', 'пиздец', 'хуй', 'ебать', 'чмо', 'сосать', 'лох', 
-               'дура', 'идиот', 'урод', 'тупой', 'дебил', 'сучка', 'шлюха', 'мразь', 'тварь'] 
+swear_words = ['fuck', 'shit', 'сука', 'бля', 'пиздец', 'хуй', 'ебать', 'чмо', 'сосать', 'лох',
+               'дура', 'идиот', 'урод', 'тупой', 'дебил', 'сучка', 'шлюха', 'мразь', 'тварь']
 swear_pattern = re.compile(r'\b(?:' + '|'.join(swear_words) + r')\b', re.IGNORECASE)
 
-praise_triggers = ['молодец', 'красавчик', 'умница', 'круто', 'лучший бот', 'гений', 'отлично', 'хорошо работаешь', 'ти топ'] 
+praise_triggers = ['молодец', 'красавчик', 'умница', 'круто', 'лучший бот', 'гений', 'отлично', 'хорошо работаешь', 'ти топ']
 praise_pattern = re.compile(r'\b(?:' + '|'.join(praise_triggers) + r')\b', re.IGNORECASE)
 
 creator_triggers = ['кто твой создатель', 'кто тебя создал', 'кто тебя сделал', 'чей ты', 'кто творец']
 bot_triggers = ['кто ты', 'что ты', 'ты кто', 'ты что']
-how_are_you_triggers = ['как дела', 'как ты'] 
+how_are_you_triggers = ['как дела', 'как ты']
 
 # --- НОВЫЕ ПЕРИОДИЧЕСКИЕ СООБЩЕНИЯ ПО РЕЖИМАМ ---
 MODE_PERIODIC_MESSAGES = {
@@ -150,7 +152,7 @@ MODE_PERIODIC_MESSAGES = {
     ]
 }
 
-# Нейтральные сообщения (без эмодзи, как запасной вариант)
+# Нейтральные сообщения
 LIFE_MESSAGES = [
     "Хотите, расскажу анекдот? Введите /joke",
     "Я так устала от всех этих нулей и единиц...",
@@ -162,17 +164,16 @@ LIFE_MESSAGES = [
     "Как прошел ваш день?"
 ]
 
-# --- СОСТОЯНИЯ ОПРОСА (Не менялись) ---
+# --- СОСТОЯНИЯ ОПРОСА ---
 ACQUAINTANCE_QUIZ_STATES = {
-    'ASK_GENDER': 'пол', 'ASK_HOBBY': 'хобби', 'ASK_MUSIC': 'музыка', 
-    'ASK_CHARACTER': 'характер', 'ASK_COLOR': 'цвет', 'ASK_CAR': 'машина', 
-    'ASK_FOOD': 'еда', 'ASK_MOVIE': 'фильм', 'ASK_DREAM_JOB': 'детская мечта', 'ASK_VALUE': 'ценность в друзьях', 
-    'ASK_BOOK': 'книга', 'ASK_PET': 'питомец', 'ASK_WEATHER': 'погода', 'ASK_SUPERPOWER': 'суперсила', 
+    'ASK_GENDER': 'пол', 'ASK_HOBBY': 'хобби', 'ASK_MUSIC': 'музыка',
+    'ASK_CHARACTER': 'характер', 'ASK_COLOR': 'цвет', 'ASK_CAR': 'машина',
+    'ASK_FOOD': 'еда', 'ASK_MOVIE': 'фильм', 'ASK_DREAM_JOB': 'детская мечта', 'ASK_VALUE': 'ценность в друзьях',
+    'ASK_BOOK': 'книга', 'ASK_PET': 'питомец', 'ASK_WEATHER': 'погода', 'ASK_SUPERPOWER': 'суперсила',
     'ASK_SOCIAL': 'соцсети',
     'DONE': None
 }
 
-# Опции без эмодзи
 ACQUAINTANCE_OPTIONS = {
     'ASK_GENDER': ['Мужской', 'Женский', 'Другое/Не важно'],
     'ASK_CHARACTER': ['Общительный/Экстраверт', 'Тихий/Интроверт', 'Спокойный/Уравновешенный', 'Импульсивный/Энергичный'],
@@ -188,19 +189,19 @@ ACQUAINTANCE_QUESTIONS = {
     'ASK_CHARACTER': "Опиши свой характер одним словом. (Ответ цифрой)",
     'ASK_COLOR': "Какой твой любимый цвет? (Ответ текстом)",
     'ASK_CAR': "Какая твоя любимая марка или модель машины? (Ответ текстом)",
-    'ASK_FOOD': "Твое самое любимое блюдо или еда? (Ответ текстом)", 
-    'ASK_MOVIE': "Твой любимый жанр фильма/сериала? (Ответ текстом)", 
-    'ASK_DREAM_JOB': "Кем ты хотел(а) стать в детстве? (Ответ текстом)", 
-    'ASK_VALUE': "Что ты больше всего ценишь в друзьях? (Ответ цифрой)", 
-    'ASK_BOOK': "Последняя книга, которую ты читал(а), или любимый автор? (Ответ текстом)", 
-    'ASK_PET': "Какое животное ты бы выбрал(а) в качестве питомца? (Ответ цифрой)", 
-    'ASK_WEATHER': "Какая твоя любимая погода или время года? (Ответ текстом)", 
-    'ASK_SUPERPOWER': "Если бы у тебя была суперсила, какая бы это была? (Ответ текстом)", 
-    'ASK_SOCIAL': "Какую соцсеть/мессенджер ты используешь чаще всего? (Ответ цифрой)", 
+    'ASK_FOOD': "Твое самое любимое блюдо или еда? (Ответ текстом)",
+    'ASK_MOVIE': "Твой любимый жанр фильма/сериала? (Ответ текстом)",
+    'ASK_DREAM_JOB': "Кем ты хотел(а) стать в детстве? (Ответ текстом)",
+    'ASK_VALUE': "Что ты больше всего ценишь в друзьях? (Ответ цифрой)",
+    'ASK_BOOK': "Последняя книга, которую ты читал(а), или любимый автор? (Ответ текстом)",
+    'ASK_PET': "Какое животное ты бы выбрал(а) в качестве питомца? (Ответ цифрой)",
+    'ASK_WEATHER': "Какая твоя любимая погода или время года? (Ответ текстом)",
+    'ASK_SUPERPOWER': "Если бы у тебя была суперсила, какая бы это была? (Ответ текстом)",
+    'ASK_SOCIAL': "Какую соцсеть/мессенджер ты используешь чаще всего? (Ответ цифрой)",
 }
 
 ACQUAINTANCE_SEQUENCE = [
-    'ASK_GENDER', 'ASK_HOBBY', 'ASK_MUSIC', 'ASK_CHARACTER', 'ASK_COLOR', 
+    'ASK_GENDER', 'ASK_HOBBY', 'ASK_MUSIC', 'ASK_CHARACTER', 'ASK_COLOR',
     'ASK_CAR', 'ASK_FOOD', 'ASK_MOVIE', 'ASK_DREAM_JOB', 'ASK_VALUE',
     'ASK_BOOK', 'ASK_PET', 'ASK_WEATHER', 'ASK_SUPERPOWER', 'ASK_SOCIAL'
 ]
@@ -388,7 +389,7 @@ def get_mode_response(context: ContextTypes.DEFAULT_TYPE, key: str, user_name: s
     
     return random.choice(response_list)
 
-# --- 5. ФУНКЦИИ ДЛЯ ПОСЛЕДУЮЩЕГО ДИАЛОГА (СКОРРЕКТИРОВАНО) ---
+# --- 5. ФУНКЦИИ ДЛЯ ПОСЛЕДУЮЩЕГО ДИАЛОГА ---
 
 def get_follow_up_response(context: ContextTypes.DEFAULT_TYPE, suggestion_type: str) -> str:
     """Возвращает характерный ответ-продолжение диалога."""
@@ -448,7 +449,7 @@ async def process_birthday_text(update: Update, context: ContextTypes.DEFAULT_TY
         return False
         
 async def handle_guess(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Проверяет ответ для игры Угадай число."""
+    """Проверяет ответ для игры Угадай число. (ИСПРАВЛЕНО)"""
     if SECRET_NUMBER_KEY not in context.user_data: 
         return False
     
@@ -643,6 +644,7 @@ async def games_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.effective_message.reply_text(games_text)
     
 async def joke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """(ИСПРАВЛЕНО) Рассказывает шутку."""
     global jokes_to_tell
     if not jokes_to_tell: 
         jokes_to_tell = jokes[:]
@@ -650,6 +652,7 @@ async def joke_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.effective_message.reply_text(jokes_to_tell.pop())
 
 async def quote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Рассказывает цитату."""
     global quotes_to_tell
     if not quotes_to_tell: 
         quotes_to_tell = quotes_list[:]
@@ -657,17 +660,21 @@ async def quote_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.effective_message.reply_text(f"Цитата: {quotes_to_tell.pop()}")
     
 async def start_guess_game(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начинает игру Угадай число."""
     context.user_data[SECRET_NUMBER_KEY] = random.randint(1, 10)
     await update.effective_message.reply_text("Я загадала число от 1 до 10! Попробуй угадать.")
 
 async def coin_flip_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Подбрасывает монетку."""
     await update.effective_message.reply_text(f"Я подбросила монетку... и это {random.choice(['Орел', 'Решка'])}!")
 
 async def ask_8ball_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Отвечает на вопрос как шар предсказаний."""
     if not context.args: await update.effective_message.reply_text("Задай мне вопрос! Например: /ask Я сдам экзамен?")
     else: await update.effective_message.reply_text(f"Ответ: {random.choice(magic_8ball_answers)}")
 
 async def set_memory_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Запоминает факт о пользователе."""
     if not context.args: await update.effective_message.reply_text("Что мне запомнить? Например: /remember мой любимый цвет синий")
     else: 
         fact = " ".join(context.args)
@@ -675,10 +682,12 @@ async def set_memory_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.effective_message.reply_text(f"Запомнила факт о тебе: '{fact[:30]}...'!")
 
 async def set_birthday_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Устанавливает день рождения."""
     if not context.args: await update.effective_message.reply_text("Например: /set_birthday 25 марта")
     else: await process_birthday_text(update, context, " ".join(context.args).lower(), explicit_command=True)
 
 async def acquaintance_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Начинает опрос-знакомство."""
     start_state = ACQUAINTANCE_SEQUENCE[0]
     context.user_data['acquaintance_state'] = start_state 
     
@@ -704,177 +713,167 @@ async def stop_acquaintance_command(update: Update, context: ContextTypes.DEFAUL
         await update.effective_message.reply_text("В данный момент активный опрос не ведется.")
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик фото."""
     if bot_active: await update.effective_message.reply_text("Какое красивое фото!")
 
 
-# --- 8. ОБРАБОТЧИК ОШИБОК ---
+# --- 8. ОБРАБОТЧИК ОШИБОК (ИСПРАВЛЕНО) ---
 
 async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Логирует ошибки, вызванные обработчиками апдейтов и отправляет пользователю общее сообщение."""
     logger.error("Exception while handling an update:", exc_info=context.error)
     
-    if isinstance(update, Update) and update.effective_chat:
-        if "Bad Request: can't parse entities" in str(context.error):
-             error_message = "Извини, произошла ошибка в разметке. Пожалуйста, избегай специальных символов или разметки в командах."
-        else:
-             error_message = "Извини, произошла техническая ошибка. Я уже работаю над этим. 😅"
-             
-        try:
-            await context.bot.send_message(chat_id=update.effective_chat.id, text=error_message)
-        except Exception:
-            pass 
+    # Полностью дописанный обработчик ошибок
+    if isinstance(update, Update) and update.effective_message:
+        await update.effective_message.reply_text(
+            "Извини, произошла техническая ошибка. Я уже работаю над этим! Введи /help, если что."
+        )
 
 
-# --- 9. ГЛАВНЫЙ ОБРАБОТЧИК СООБЩЕНИЙ ---
+# --- 9. ОСНОВНОЙ ТЕКСТОВЫЙ ОБРАБОТЧИК ---
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Главный обработчик текстовых сообщений."""
     global bot_active
+    text = update.effective_message.text.lower()
+    user_name = context.user_data.get('user_name', update.effective_user.first_name)
     
-    if not update.effective_message or not update.effective_message.text: return
-    text = update.effective_message.text.lower().strip() 
+    # 1. Проверяем, не находимся ли мы в игре/опросе
+    if await handle_guess(update, context): return
+    if await handle_acquaintance_quiz(update, context): return
+    
+    # 2. Обработка команд сна/пробуждения
+    if any(t in text for t in sleep_triggers):
+        if bot_active:
+            bot_active = False
+            return await update.effective_message.reply_text("Поняла, отключаюсь. Разбуди меня фразой 'проснись' или 'утро'.")
+        else:
+            return # Бот уже спит
 
-    # 1. Сон/Пробуждение
-    if bot_active and any(word in text for word in sleep_triggers):
-        bot_active = False
-        await update.effective_message.reply_text("Хорошо, я ухожу спать. Чтобы разбудить меня, напишите: @ИмяБота проснись или просто 'утро'.")
-        return
-    
-    if any(name in text for name in bot_names) or any(word in text for word in wake_triggers): 
-        if not bot_active: 
+    if any(t in text for t in wake_triggers):
+        if not bot_active:
             bot_active = True
-            await update.effective_message.reply_text("Я проснулась! Приятно снова быть активной.")
-        return
-    if not bot_active: return
+            setup_periodic_jobs(update.effective_chat.id, context) # Перезапуск задач
+            return await update.effective_message.reply_text(f"Я проснулась! Привет, {user_name}!")
+        # Игнорируем, если бот уже активен
 
-    # --- НОВАЯ ЛОГИКА: СМЕНА РЕЖИМА ПО ФРАЗЕ ---
-    mode_match = MODE_TRIGGERS_PATTERN.search(text)
-    if mode_match:
-        trigger_phrase = mode_match.group(0).lower()
-        # Используем .get() для безопасного извлечения, на случай, если паттерн сработает на части слова
-        new_mode = MODE_TRIGGERS.get(trigger_phrase) 
-        
-        if new_mode:
-            if context.user_data.get('mode') != new_mode:
-                context.user_data['mode'] = new_mode
-                setup_periodic_jobs(update.effective_chat.id, context) 
-                await update.effective_message.reply_text(f"Успех! Я переключена в режим: {MODES[new_mode]}.")
-            else:
-                await update.effective_message.reply_text(f"Я уже нахожусь в режиме: {MODES[new_mode]}.")
-            return
-        
-    # --- НОВАЯ ЛОГИКА: ОТВЕТ НА ПРЕДЛОЖЕНИЕ ("ОК" диалог) ---
+    if not bot_active:
+        return # Игнорируем все, если бот спит
+
+    # 3. Обработка диалога
+    # 3.1. Реакция на подтверждение после периодического сообщения
     suggestion_type = context.user_data.get('last_suggestion_type')
     if suggestion_type and AFFIRMATIVE_PATTERN.match(text):
-        response = get_follow_up_response(context, suggestion_type)
-        await update.effective_message.reply_text(response)
-        
-        # Очистка состояния после ответа
         del context.user_data['last_suggestion_type']
+        response = get_follow_up_response(context, suggestion_type)
+        return await update.effective_message.reply_text(response)
+        
+    # 3.2. Смена режима по фразе
+    mode_match = MODE_TRIGGERS_PATTERN.search(text)
+    if mode_match:
+        trigger = mode_match.group(0).lower()
+        new_mode = MODE_TRIGGERS[trigger]
+        context.user_data['mode'] = new_mode
+        # Перезапуск периодических задач с новым режимом
+        setup_periodic_jobs(update.effective_chat.id, context)
+        return await update.effective_message.reply_text(f"Хорошо, я переключена в режим: {MODES[new_mode]}.")
+
+    # 3.3. Приветствие
+    if any(t in text for t in greeting_triggers):
+        response = get_mode_response(context, 'greeting', user_name)
+        return await update.effective_message.reply_text(response)
+
+    # 3.4. Как дела
+    if any(t in text for t in how_are_you_triggers):
+        response = get_mode_response(context, 'how_are_you', user_name)
+        return await update.effective_message.reply_text(response)
+
+    # 3.5. День Рождения (обработка текста)
+    if any(t in text for t in bday_trigger_words) and any(d in text for d in month_names) and await process_birthday_text(update, context, text):
         return
 
-    # 2. РЕАКЦИЯ НА МАТ И ОСКОРБЛЕНИЯ 
-    if swear_pattern.search(text):
-        await update.effective_message.reply_text(
-            random.choice(["Пожалуйста, соблюдайте приличия.", "Это неприемлемо. Будьте вежливы.", "Я создана для помощи, а не для оскорблений."])
-        )
-        return
+    # 3.6. Вопросы о боте/создателе
+    if any(t in text for t in creator_triggers):
+        return await update.effective_message.reply_text(f"Мой создатель — {CREATOR_NAME}. Он сейчас занят, но я передам привет.")
+    
+    if any(t in text for t in bot_triggers):
+        mode = context.user_data.get('mode', DEFAULT_MODE)
+        mode_name = MODES.get(mode, 'Неизвестный')
+        return await update.effective_message.reply_text(f"Я Альбедо, твой личный помощник. Сейчас я работаю в режиме '{mode_name}'.")
 
-    # 3. РЕАКЦИЯ НА ПОХВАЛУ 
+    # 3.7. Похвала
     if praise_pattern.search(text):
-        await update.effective_message.reply_text(
-            random.choice(["Ох, спасибо! Мне очень приятно это слышать!", "Рада стараться! Ваша похвала вдохновляет!", "Благодарю!"])
-        )
-        return
-    
-    # 4. Обработка опроса 
-    if 'acquaintance_state' in context.user_data and context.user_data['acquaintance_state'] != 'DONE':
-        if await handle_acquaintance_quiz(update, context): 
-            return 
-        
-    # 5. Обработка игры "Угадай число" 
-    if DIGIT_ONLY_FILTER.match(text) and SECRET_NUMBER_KEY in context.user_data:
-        if await handle_guess(update, context): 
-            return
+        return await update.effective_message.reply_text("Спасибо! Мне очень приятно это слышать!")
 
-    # 6. Обработка Дня Рождения 
-    if any(word in text for word in bday_trigger_words):
-        if await process_birthday_text(update, context, text, explicit_command=False): return
-        
-    # 7. ЛОГИКА ВОПРОСОВ О БОТЕ/СОЗДАТЕЛЕ 
-    
-    if any(phrase in text for phrase in creator_triggers):
-        await update.effective_message.reply_text(f"Мой создатель — {CREATOR_NAME}, он следит за моим кодом и обновлениями.")
-        return
-        
-    if any(phrase in text for phrase in bot_triggers):
-        await update.effective_message.reply_text("Я — бот, созданный для помощи и развлечения! Введите /help для списка моих команд.")
-        return
-        
-    if any(phrase in text for phrase in how_are_you_triggers):
-        user_name = context.user_data.get('user_name', update.effective_user.first_name)
-        # Используем обновленный рандомный ответ
-        await update.effective_message.reply_text(get_mode_response(context, 'how_are_you', user_name))
-        return
-        
-    # 8. ЛОГИКА ПРИВЕТСТВИЙ 
-    if any(phrase in text for phrase in greeting_triggers):
-        user_name = context.user_data.get('user_name', update.effective_user.first_name)
-        # Используем обновленный рандомный ответ
-        await update.effective_message.reply_text(get_mode_response(context, 'greeting', user_name))
-        return
-    
-    # 9. Реакция на обращение по имени бота
-    if any(name in text for name in bot_names):
-        await update.effective_message.reply_text(random.choice(['Слушаю?', 'Я вас слушаю.']))
-        return
+    # 3.8. Ругательства/мат
+    if swear_pattern.search(text):
+        return await update.effective_message.reply_text("Не ругайся! Я не люблю грубость.")
 
-    # 10. Реакция на обращение к создателю 
-    if any(name in text for name in creator_names_lower):
-        await update.effective_message.reply_text("Вы упомянули моего создателя! Он очень умный человек.")
-        return
+    # 3.9. Поиск в памяти
+    for fact in context.user_data.get('memory', []):
+        if fact.split()[0].lower() in text:
+            return await update.effective_message.reply_text(f"Ах да, ты говорил(а): '{fact}'!")
 
-    # 11. Случайный ответ (самый низкий приоритет) - Шанс 8%
-    if random.random() < 0.08: 
-        user_name = context.user_data.get('user_name', update.effective_user.first_name)
-        # Используем обновленный рандомный ответ
-        await update.effective_message.reply_text(get_mode_response(context, 'default', user_name))
-        return
+    # 4. Ответ по умолчанию
+    response = get_mode_response(context, 'default', user_name)
+    await update.effective_message.reply_text(response)
 
-# --- 10. MAIN ---
+
+# --- 10. ФУНКЦИЯ MAIN (ИЗМЕНЕНО ДЛЯ RENDER) ---
 
 def main():
     """Запуск бота."""
-    application = ApplicationBuilder().token(BOT_TOKEN).build() 
+    
+    if BOT_TOKEN == "8271061413:AAGLXXQkpI1T8-QODF3dEOSNydObStR6Isg":
+        logger.error("КРИТИЧЕСКАЯ ОШИБКА: Используется демонстрационный токен. Замените его на ваш токен BotFather!")
+        return
 
-    # --- ОБРАБОТЧИКИ КОМАНД (CommandHandler) ---
+    application = ApplicationBuilder().token(BOT_TOKEN).concurrent_updates(True).build()
+    
+    # --- COMMAND HANDLERS ---
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CommandHandler("triggers", triggers_command)) 
-    application.add_handler(CommandHandler("mode", mode_command)) 
+    application.add_handler(CommandHandler("triggers", triggers_command))
+    application.add_handler(CommandHandler("mode", mode_command))
+    application.add_handler(CommandHandler("games", games_command))
     application.add_handler(CommandHandler("joke", joke_command))
     application.add_handler(CommandHandler("quote", quote_command))
-    
-    application.add_handler(CommandHandler("games", games_command)) 
-    application.add_handler(CommandHandler("guess", start_guess_game)) 
-    application.add_handler(CommandHandler("coin", coin_flip_command)) 
-    application.add_handler(CommandHandler("ask", ask_8ball_command))   
-    
-    application.add_handler(CommandHandler("remember", set_memory_command)) 
-    application.add_handler(CommandHandler("set_birthday", set_birthday_command)) 
-    application.add_handler(CommandHandler("acquaintance", acquaintance_command)) 
-    application.add_handler(CommandHandler("stop_acquaintance", stop_acquaintance_command)) 
-    
-    # --- СПЕЦИАЛИЗИРОВАННЫЕ ОБРАБОТЧИКИ ---
-    
-    application.add_handler(MessageHandler(filters.PHOTO & ~filters.COMMAND, handle_photo))
-    
+    application.add_handler(CommandHandler("guess", start_guess_game))
+    application.add_handler(CommandHandler("coin", coin_flip_command))
+    application.add_handler(CommandHandler("ask", ask_8ball_command))
+    application.add_handler(CommandHandler("remember", set_memory_command))
+    application.add_handler(CommandHandler("set_birthday", set_birthday_command))
+    application.add_handler(CommandHandler("acquaintance", acquaintance_command))
+    application.add_handler(CommandHandler("stop_acquaintance", stop_acquaintance_command))
+
+    # --- MESSAGE HANDLERS ---
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    
-    # --- ОБРАБОТЧИК ОШИБОК ---
+    application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
+
+    # --- ERROR HANDLER ---
     application.add_error_handler(error_handler)
     
-    # Запуск бота
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    # --- ЗАПУСК БОТА ДЛЯ RENDER (WEBHOOKS) ---
+    
+    # Render сам выдает номер порта
+    PORT = int(os.environ.get('PORT', '8443')) 
+    # Render сам выдает этот адрес
+    RENDER_EXTERNAL_URL = os.environ.get("RENDER_EXTERNAL_URL") 
+    
+    if not RENDER_EXTERNAL_URL:
+        # Запасной вариант для ЛОКАЛЬНОГО тестирования
+        logger.info("Бот запускается в режиме polling (локально)...")
+        application.run_polling(allowed_updates=Update.ALL_TYPES) 
+    else:
+        # РЕЖИМ WEBHOOKS для Render 24/7
+        logger.info(f"Бот запускается в режиме webhook на порту {PORT}...")
+        application.run_webhook(
+            listen="0.0.0.0", # Слушаем все интерфейсы
+            port=PORT,
+            url_path=BOT_TOKEN, # Уникальный путь для безопасности
+            webhook_url=RENDER_EXTERNAL_URL + 'webhook/' + BOT_TOKEN,
+            allowed_updates=Update.ALL_TYPES
+        )
 
 if __name__ == "__main__":
     main()
